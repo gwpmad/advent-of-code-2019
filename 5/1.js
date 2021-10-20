@@ -8,51 +8,44 @@ function processIntCode(index = 0) {
     const value = ints[i];
     if (value === '99') return;
     const { modes, opcode } = parseOpcodeValue(value);
-    switch (opcode) {
-      case '1':
-        opcodeHandlers[1](modes, i);
-        i += 4;
-        break;
-      case '2':
-        opcodeHandlers[2](modes, i);
-        i += 4;
-        break;
-      case '3':
-        opcodeHandlers[3](modes, i);
-        return;
-      case '4':4
-        opcodeHandlers[4](modes, i);
-        i += 2;
-        break;
-      default:
-        throw new Error('should only be 1 2 3 or 4');
-    }
+    const paramsLength = opcodeParamLengthLookup[opcode];
+    opcodeHandlers[opcode](modes, i, paramsLength);
+    if (opcode === '3') return;
+    i += (paramsLength+1);
   }
 }
 
+const opcodeParamLengthLookup = {
+  1: 3,
+  2: 3,
+  3: 1,
+  4: 1,
+};
+
 const opcodeHandlers = {
-  1: (modes, i) => {
-    const params = getParams(i, modes, 3);
+  1: (modes, i, paramsLength) => {
+    const params = getParams(i, modes, paramsLength);
     ints[params[2]] = String(params[0] + params[1]);
   },
-  2: (modes, i) => {
-    const params = getParams(i, modes, 3);
+  2: (modes, i, paramsLength) => {
+    const params = getParams(i, modes, paramsLength);
     ints[params[2]] = String(params[0] * params[1]);
   },
-  3: (modes, i) => {
+  3: (modes, i, paramsLength) => {
+    const params = getParams(i, modes, paramsLength);
     console.log('input required')
     const callback = (data) => {
       process.stdin.removeListener('data', callback);
       process.stdin.pause();
-      const location = Number(ints[i + 1]);
-      ints[location] = data.toString();
+      const param = Number(params[0]);
+      ints[param] = data.toString();
       processIntCode(i+2);
     };
     process.stdin.resume();
     process.stdin.on('data', callback);
   },
-  4: (modes, i) => {
-    const [param] = getParams(i, modes, 1);
+  4: (modes, i, paramsLength) => {
+    const [param] = getParams(i, modes, paramsLength, '4');
     console.log(param);
   }
 };
@@ -70,11 +63,11 @@ function parseOpcodeValue(value) {
   return { modes, opcode };
 }
 
-function getParams(intCodeIdx, modes, paramLength) {
+function getParams(intCodeIdx, modes, paramsLength, opcode) {
   const params = [];
-  for (let i = 0; i < paramLength; i++) {
+  for (let i = 0; i < paramsLength; i++) {
     const initialParam = ints[intCodeIdx + i + 1];
-    if (i === 2) {
+    if (i === (paramsLength-1) && opcode !== '4') {
       params.push(initialParam);
       continue;
     }
